@@ -17,22 +17,22 @@ import os
 
 arr_pool=np.array([])
 arr_pop=np.array([])
-int_uniqNum = 10000000
+int_startingExpNum = 10000000
 int_numChromesInPop=100 #염색체 수
 int_probGeneLive=100   #유전자를 고를때 살아남을 확률. 예를들어  10이면 10%, 100이면 1%, 2이면 50%
-df_stat=pd.DataFrame(); dfm=pd.DataFrame(); dfw=pd.DataFrame();
-idx_x=[]
-idx_y=[]
-period_q=[]
+df_quarterlyData=pd.DataFrame(); df_monthlyData=pd.DataFrame(); df_weeklyData=pd.DataFrame();
+lst_quarterlyXs=[]
+lst_quarterlyYs=[]
+date_forecastingPeriod=[]
 np.random.seed(5252)
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s][%(levelname)s][%(funcName)s][%(lineno)d] %(message)s')
 df_resFile=pd.DataFrame()
-lst_resFile = []
+lst_nowcastingResult = []
 logging.info('GA Trainig loaded')
 
 
 def fnc_init():
-  global arr_pool,df_stat, idx_x,idx_y,dfm,dfw
+  global arr_pool,df_quarterlyData, lst_quarterlyXs,lst_quarterlyYs,df_monthlyData,df_weeklyData
   df_stat = pd.read_csv('../data/resultQuarter2_1.csv',sep='\t')
   dfm =  pd.read_csv('../data/resultMonthly2.csv',sep='\t')
   dfw =  pd.read_csv('../data/resultWeekly2.csv',sep='\t')
@@ -54,12 +54,12 @@ def fnc_addChromeToPop(chrome):
     arr_pop=np.array(lst_temp1)
     
 def fnc_evaluateChrome(df_statResize,dateFrTo,int_popNum):
-  global arr_pop,df_resFile,int_uniqNum, lst_resFile
+  global arr_pop,df_resFile,int_startingExpNum, lst_nowcastingResult
   clf=svm.SVR()
-  arr_yVal = np.array(df_statResize[idx_y])[:-1]
+  arr_yVal = np.array(df_statResize[lst_quarterlyYs])[:-1]
   #logging.info('gdp'+str(list(arr_yVal)))
-  arr_yTest = np.array(df_statResize[idx_y])[-2:-1]
-  arr_yTest2= np.array(df_statResize[idx_y])[-4:]
+  arr_yTest = np.array(df_statResize[lst_quarterlyYs])[-2:-1]
+  arr_yTest2= np.array(df_statResize[lst_quarterlyYs])[-4:]
   arr_chromeEval = []
   lst_score=[1000,600,300,200,150,140,130,120,110,100,50,-1000]
   dbl_calcweight = 1 #1을 주면 fitting한 값만 평가하는 것임
@@ -71,13 +71,13 @@ def fnc_evaluateChrome(df_statResize,dateFrTo,int_popNum):
     arr_xTest = arr_xVals[-2:-1]
     arr_xTest2= arr_xVals[-4:]
     arr_xVals = arr_xVals[:-1]
-    arr_xMonths = sm.add_constant(np.array(dfm[arr_genesTp]),prepend=True) #월별 GDP 예측을 위한 값
-    arr_xWeeks = sm.add_constant(np.array(dfw[arr_genesTp]),prepend=True)
+    arr_xMonths = sm.add_constant(np.array(df_monthlyData[arr_genesTp]),prepend=True) #월별 GDP 예측을 위한 값
+    arr_xWeeks = sm.add_constant(np.array(df_weeklyData[arr_genesTp]),prepend=True)
     #ols_res = sm.OLS(arr_yVal, arr_xVals).fit()
     clf.fit(arr_xVals,arr_yVal)
 #     df_res = pd.concat((pd.DataFrame(arr_xVals[:,1:]),pd.DataFrame(arr_yVal)),1)
     lst_res = []
-    arr_genesTp.append(idx_y) 
+    arr_genesTp.append(lst_quarterlyYs)
 #     df_res.columns = arr_genesTp
     dbl_rSquare=np.corrcoef(arr_yVal,clf.predict(arr_xVals))[0,1]
 #     df_res['fitted']=clf.predict(arr_xVals)
@@ -208,19 +208,19 @@ def fnc_evolvePop(df_pop,int_curPop):
   logging.debug(str(int_curPop)+'세대 염색체 수(교배후): '+str(len(arr_pop)))
   
 def fnc_execGa():
-  global int_uniqNum,df_resFile,lst_resFile,period_q,dfm,dfw
+  global int_startingExpNum,df_resFile,lst_nowcastingResult,date_forecastingPeriod,df_monthlyData,df_weeklyData
 
 
   #간격을 10으로 하자
   int_gap = 21
   fnc_init()
-  arr_frPoint = np.arange(0,len(df_stat),1)
+  arr_frPoint = np.arange(0,len(df_quarterlyData),1)
   #arr_frPoint=[11]  #11은 위기구간 <- 예측률이 떨어질때 #6은 예측률이 잘맞을때1
   #lst_finRes=[]
   for p in arr_frPoint: #기간에 따른 조건 변경
     if p == 29: break #마지막 값에는 GDP가 없기 때문에 계산 안함
-    if (p+int_gap) > len(df_stat): continue
-    df_statResize = df_stat[p:p+int_gap]
+    if (p+int_gap) > len(df_quarterlyData): continue
+    df_statResize = df_quarterlyData[p:p+int_gap]
     period_q = pd.to_datetime(df_statResize['date'][-2:])
     dfm = dfm.ix[period_q.values[1]:][1:]
     dfw = dfw.ix[period_q.values[1]:][1:]
