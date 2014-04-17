@@ -3,7 +3,7 @@
 # Evolutionary GDP Nowcasting
 # Version 0.1
 # Desc : Bloomberg, ECOS에서 입수데이터 집계
-# Date : 2014. 4. 16
+# Date : 2014. 4. 17
 # Copyright :
 
 import pandas as pd
