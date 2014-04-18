@@ -16,11 +16,13 @@ import scipy.stats as ss
 import os
 from sklearn import svm
 
+import egn_etl as eetl
+
 arr_pool = np.array([])  #모든 경제지표가 들어가는 Pool
 arr_pop = np.array([])  #Pool에서 선택된 지표군
-df_quarterlyData = pd.DataFrame();  #분기 집계된 데이터
-df_monthlyData = pd.DataFrame();  #월단위 집계된 데이터
-df_weeklyData = pd.DataFrame();  #주단위 집계된 데이터
+df_quarter = pd.DataFrame();  #분기 집계된 데이터
+df_month = pd.DataFrame();  #월단위 집계된 데이터
+df_week = pd.DataFrame();  #주단위 집계된 데이터
 lst_quarterlyXs = []  #분기 단위에서 사용할 경제지표 리스트
 lst_quarterlyYs = []  #분기 단위 GDP
 int_startingExpNum = 10000000  #실험 일련번호
@@ -34,20 +36,25 @@ logging.basicConfig(level=logging.INFO, format='[%(asctime)s][%(levelname)s][%(f
 np.random.seed(5252)
 
 
-def init_egn():
+def init_egn(is_gui):
     """
     (1)집계된 데이터 입력, (2)GDP, 지표 구분, (3)지표 Pool 생성
 
     """
-    global arr_pool, df_quarterlyData, lst_quarterlyXs, lst_quarterlyYs, df_monthlyData, df_weeklyData
+    global arr_pool, df_quarter, lst_quarterlyXs, lst_quarterlyYs, df_month, df_week
+    
+    if(is_gui): # gui에서는 bloomberg 데이터를 eng_etl.py에서 가져와서 사용
+        df_gdp, df_quarter, df_month, df_week, df_daily = eetl.request_data_from_processing(False,[u'한국',u'글로벌'], pd.datetime(2002,3,1),pd.datetime(2014,3,31))
 
-    df_quarterlyData = pd.read_csv('../data/resultQuarter2_1.csv', sep='\t')
-    df_monthlyData = pd.read_csv('../data/resultMonthly2.csv', sep='\t')
-    df_weeklyData = pd.read_csv('../data/resultWeekly2.csv', sep='\t')
-    df_monthlyData.index = pd.to_datetime(df_monthlyData['date'])
-    df_weeklyData.index = pd.to_datetime(df_weeklyData['date'])
-    lst_quarterlyXs = df_quarterlyData.columns[2:]
-    lst_quarterlyYs = df_quarterlyData.columns[1]
+    else:
+        df_quarter = pd.read_csv('../data/resultQuarter2_1.csv', sep='\t')
+        df_month = pd.read_csv('../data/resultMonthly2.csv', sep='\t')
+        df_week = pd.read_csv('../data/resultWeekly2.csv', sep='\t')
+        df_month.index = pd.to_datetime(df_month['date'])
+        df_week.index = pd.to_datetime(df_week['date'])
+    
+    lst_quarterlyXs = df_quarter.columns[2:]
+    lst_quarterlyYs = df_quarter.columns[1]
 
     for idx in lst_quarterlyXs:
         arr_pool = np.append(arr_pool, idx)
@@ -78,8 +85,8 @@ def evaluate_chrome(df_quarterlyResize, str_exprPeriod, int_populationNo):
         arr_xTesting1Values = arr_xValues[-2:-1]    #t-1 시점
         arr_xTesting2Values = arr_xValues[-4:]      #t-4 ~ t 시점
         arr_xTrainingValues = arr_xValues[:-1]      #1 ~ t-1 시점
-        arr_xMonthly = sm.add_constant(np.array(df_monthlyData[lst_genes]), prepend=True)  #월별 GDP 예측용 값
-        arr_xWeekly = sm.add_constant(np.array(df_weeklyData[lst_genes]), prepend=True)  #주별 GDP 예측용 값
+        arr_xMonthly = sm.add_constant(np.array(df_month[lst_genes]), prepend=True)  #월별 GDP 예측용 값
+        arr_xWeekly = sm.add_constant(np.array(df_week[lst_genes]), prepend=True)  #주별 GDP 예측용 값
         
         clf.fit(arr_xTrainingValues, arr_yTrainingValues)
         
@@ -200,18 +207,18 @@ def evolve_population(df_populationTable, int_populationIndex):
 
 
 def execute_egn():
-    global lst_nowcastingResult, date_forecastingPeriod, df_monthlyData, df_weeklyData
+    global lst_nowcastingResult, date_forecastingPeriod, df_month, df_week
 
     int_gap = 21 #훈련기간(20) + 예측기간(1)
     init_egn()
-    arr_testingPoints = np.arange(0, len(df_quarterlyData), 1)
+    arr_testingPoints = np.arange(0, len(df_quarter), 1)
     for int_testingPoint in arr_testingPoints:  #기간에 따른 조건 변경
         if int_testingPoint == 1: break  #마지막 값에는 GDP가 없기 때문에 계산 안함
-        if (int_testingPoint + int_gap) > len(df_quarterlyData): continue
-        df_quarterlyResize = df_quarterlyData[int_testingPoint:int_testingPoint + int_gap]
+        if (int_testingPoint + int_gap) > len(df_quarter): continue
+        df_quarterlyResize = df_quarter[int_testingPoint:int_testingPoint + int_gap]
         date_forecastingPeriod = pd.to_datetime(df_quarterlyResize['date'][-2:])
-        df_monthlyData = df_monthlyData.ix[date_forecastingPeriod.values[1]:][1:]
-        df_weeklyData = df_weeklyData.ix[date_forecastingPeriod.values[1]:][1:]
+        df_month = df_month.ix[date_forecastingPeriod.values[1]:][1:]
+        df_week = df_week.ix[date_forecastingPeriod.values[1]:][1:]
         logging.info(str(int_testingPoint) + '분기, GDP:' + str(list(df_quarterlyResize['gdp'])))
 
         for int_populationIndex in range(100):  # 세대수

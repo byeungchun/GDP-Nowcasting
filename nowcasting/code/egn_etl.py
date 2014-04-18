@@ -11,7 +11,7 @@ import pandas as pd
 df_bbData = pd.DataFrame()
 df_bbDataCol = pd.DataFrame()
 
-def extract_bloomberg_excel(str_bbDataFile, str_bbIndexFile):
+def extract_bloomberg_excel(str_bbDataFile, str_bbIndexFile,is_excel):
     '''
     블룸버그에서 받아온 엑셀파일을 dataframe 형식으로 변경하여 저장
     :param str_bbDataFile: 실제 데이터 파일
@@ -20,17 +20,26 @@ def extract_bloomberg_excel(str_bbDataFile, str_bbIndexFile):
     
     global df_bbData, df_bbDataCol
     
-    #데이터
-    df_bbData = pd.read_excel(str_bbDataFile,'Sheet1')
-    df_bbData = df_bbData.ix[5:,:] #제목행 및 날짜 없는행 제거
-    df_bbData = df_bbData.replace('#N/A N/A','') #엑셀에서 데이터 없는 셀에 들어간 문자열 제거
-    df_bbData = df_bbData.convert_objects(convert_numeric=True) #모든 컬럼은 숫자형식으로 변환
+    if(is_excel):
+        #데이터
+        df_bbData = pd.read_excel(str_bbDataFile,'Sheet1')
+        df_bbData = df_bbData.ix[5:,:] #제목행 및 날짜 없는행 제거
+        df_bbData = df_bbData.replace('#N/A N/A','') #엑셀에서 데이터 없는 셀에 들어간 문자열 제거
+        df_bbData = df_bbData.convert_objects(convert_numeric=True) #모든 컬럼은 숫자형식으로 변환
+        
+        #리스트
+        df_bbIndex = pd.read_excel(str_bbIndexFile, 'index')
+        df_bbIndex.columns = ['no','idx','cat','rgn','rgn2','rmk','undf']
+        df_bbDataCol = df_bbIndex[df_bbIndex['no'].isin(df_bbData.columns)][['no','idx','rgn2']]
+        
+        #csv로 저장
+        df_bbData.to_csv('../data/DailyEconomicData.csv',sep='\t',encoding='utf-8')
+        df_bbDataCol.to_csv('../data/index.csv',sep='\t',encoding='utf-8')
+    else:
+        df_bbData = pd.read_csv('../data/DailyEconomicData.csv',sep='\t',encoding='utf-8')
+        df_bbDataCol = pd.read_csv('../data/index.csv',sep='\t',encoding='utf-8')
     
-    #리스트
-    df_bbIndex = pd.read_excel(str_bbIndexFile, 'index')
-    df_bbIndex.columns = ['no','idx','cat','rgn','rgn2','rmk','undf']
-    df_bbDataCol = df_bbIndex[df_bbIndex['no'].isin(df_bbData.columns)][['no','idx','rgn2']]
-    
+
     
 def extract_national_df(lst_nation):
     '''
@@ -43,12 +52,15 @@ def extract_national_df(lst_nation):
     df_bbData1 = df_bbData.ffill() #첫행부터 데이터가 없는 개수를 파악하기 위해 중간에 빈 값을 채워줌
     df_bbData1 = df_bbData1.ix[:-2,:] #데이터가 2013년 4월 7일 이휴는 정확하지 않아 잘라줌
     df_bbDataZero = pd.DataFrame([df_bbData1.columns,map(lambda x: df_bbData1[x].dropna().count(), df_bbData1.columns)]).T
-    df_bbDataZero.columns = ['idx','nozero_cnt']
+    df_bbDataZero.columns = ['no','nozero_cnt']
     #데이터 인덱스의 이름을 가지고와서 'no','idx','nozero_cnt' 로 구성
-    df_bbDataZero=pd.merge(df_bbDataCol[['no','idx']],df_bbDataZero,left_on='no',right_on='idx')
-    df_bbDataZero=df_bbDataZero.ix[:,[0,1,3]]
+    #df_bbDataZero=pd.merge(df_bbDataCol[['no','idx']],df_bbDataZero,on='no')
+    df_bbDataCol = df_bbDataCol[['no','idx','rgn2']]
+    df_bbDataCol['nozero_cnt'] = df_bbDataZero['nozero_cnt']
+    #df_bbDataZero=df_bbDataZero.ix[:,[0,1,3]]
     #실제 데이터가 있는 값이 3000개 이상인 index만 남겨놓음
-    df_bbDataCol = df_bbDataCol[df_bbDataCol['no'].isin(df_bbDataZero[df_bbDataZero['nozero_cnt'] > 3000]['no'])]
+    df_bbDataCol = df_bbDataCol[df_bbDataCol['nozero_cnt'] > 3000]
+    #df_bbDataCol = df_bbDataCol[df_bbDataCol['no'].isin(df_bbDataZero[df_bbDataZero['nozero_cnt'] > 3000]['no'])]
     df_nation=df_bbDataCol[df_bbDataCol['rgn2'].isin(lst_nation)]
     
     return df_nation
@@ -62,7 +74,7 @@ def agg_mmQqWw(df_nation,dt_from ,dt_to):
     :param dt_to: 끝 일자 ex) pd.datetime(2014,3,31)
     '''
     
-    df_daily = df_bbData[df_nation['no']]
+    df_daily = df_bbData[df_nation['no'].astype(str)]
     df_daily = df_daily.dropna()
     df_daily = df_daily.ix[dt_from:dt_to]
     df_daily = df_daily.ffill() #중간에 비어있는 셀은 직전 값을 채워 넣음
@@ -84,10 +96,49 @@ def agg_mmQqWw(df_nation,dt_from ,dt_to):
     df_week=df_week.bfill()
     
     return df_quarter, df_month, df_week, df_daily
+
+
+def extract_gdp_excel(xlsx_file, sheet_name):
+    df_gdp = pd.read_excel(xlsx_file,sheet_name)
+    #Ecos_gdp.xlsx의 시작은 2000년 1분기
+    df_gdp.index =pd.date_range('20000101',periods=df_gdp.shape[0],freq='Q')
     
+    return df_gdp
 
 
+def request_data_from_processing(is_excel,lst_nation,dt_from,dt_to):
+    '''
+GUI에서 데이터와 일자를 일괄적으로 요첳할때 호출하는 함수  
+    :param is_excel: 엑셀파일에서 직접 혹은 엑셀을 정리한 csv 에서 할 것인지
+    :param lst_nation:
+    :param dt_from:
+    :param dt_to:
+    '''
+    
+    global df_bbData, df_bbDataCol
+    
+    if(is_excel):
+        extract_bloomberg_excel('../data/DailyEconomicData.xlsx', '../data/index.xlsx',True)
+    else:
+        extract_bloomberg_excel('../data/DailyEconomicData.csv','../data/index.csv', False)
+        df_bbData.index=pd.to_datetime(df_bbData[df_bbData.columns[0]])
+        df_bbData = df_bbData[df_bbData.columns[1:]]
+        df_bbData.index.name = 'date'
+        #df_bbDataCol.index = df_bbDataCol[df_bbDataCol.columns[0]]
+        df_bbDataCol = df_bbDataCol[df_bbDataCol.columns[1:]]
 
+    df_nation = extract_national_df(lst_nation)
+    df_quarter,df_month,df_week,df_daily = agg_mmQqWw(df_nation,dt_from,dt_to)
+    
+    df_gdp = extract_gdp_excel('../data/Ecos_gdp.xlsx','Sheet1')
+    df_gdp = df_gdp.ix[df_quarter.index] #df_quarter가 가지고 있는 범위 만큼만 잘라줌
+    df_gdp = df_gdp[lst_nation[0]] #첫번째가 국가, 두번째는 글로벌이기 때문
+    
+    return df_gdp, df_quarter,df_month,df_week,df_daily
+
+
+if __name__ == '__main__':
+    df_gdp, df_quarter,df_month,df_week,df_daily = request_data_from_processing(False,[u'한국',u'글로벌'],pd.datetime(2002,3,1),pd.datetime(2013,12,31))
 
 
 
