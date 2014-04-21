@@ -45,6 +45,8 @@ def init_egn(is_gui):
     
     if(is_gui): # gui에서는 bloomberg 데이터를 eng_etl.py에서 가져와서 사용
         df_gdp, df_quarter, df_month, df_week, df_daily = eetl.request_data_from_processing(False,[u'한국',u'글로벌'], pd.datetime(2002,3,1),pd.datetime(2014,3,31))
+        lst_quarterlyXs = df_quarter.columns[:-2]
+        lst_quarterlyYs = df_quarter.columns[-1]
 
     else:
         df_quarter = pd.read_csv('../data/resultQuarter2_1.csv', sep='\t')
@@ -52,9 +54,8 @@ def init_egn(is_gui):
         df_week = pd.read_csv('../data/resultWeekly2.csv', sep='\t')
         df_month.index = pd.to_datetime(df_month['date'])
         df_week.index = pd.to_datetime(df_week['date'])
-    
-    lst_quarterlyXs = df_quarter.columns[2:]
-    lst_quarterlyYs = df_quarter.columns[1]
+        lst_quarterlyXs = df_quarter.columns[2:]
+        lst_quarterlyYs = df_quarter.columns[1]
 
     for idx in lst_quarterlyXs:
         arr_pool = np.append(arr_pool, idx)
@@ -210,7 +211,7 @@ def execute_egn():
     global lst_nowcastingResult, date_forecastingPeriod, df_month, df_week
 
     int_gap = 21 #훈련기간(20) + 예측기간(1)
-    init_egn()
+    init_egn(True)
     arr_testingPoints = np.arange(0, len(df_quarter), 1)
     for int_testingPoint in arr_testingPoints:  #기간에 따른 조건 변경
         if int_testingPoint == 1: break  #마지막 값에는 GDP가 없기 때문에 계산 안함
@@ -219,7 +220,7 @@ def execute_egn():
         date_forecastingPeriod = pd.to_datetime(df_quarterlyResize['date'][-2:])
         df_month = df_month.ix[date_forecastingPeriod.values[1]:][1:]
         df_week = df_week.ix[date_forecastingPeriod.values[1]:][1:]
-        logging.info(str(int_testingPoint) + '분기, GDP:' + str(list(df_quarterlyResize['gdp'])))
+        logging.info(str(int_testingPoint) + '번째 윈도우')
 
         for int_populationIndex in range(100):  # 세대수
             if int_populationIndex == 0:

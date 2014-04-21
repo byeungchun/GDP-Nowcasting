@@ -80,7 +80,7 @@ def agg_mmQqWw(df_nation,dt_from ,dt_to):
     df_daily = df_daily.ffill() #중간에 비어있는 셀은 직전 값을 채워 넣음
     df_dataCol = df_daily.columns.astype(int).astype(str)
     df_daily.columns = df_dataCol
-    lst_how = ['mean','std','first','last','min','median','max']
+    lst_how = ['mean','var','first','last','min','median','max']
     lst_cols = []
     for x1 in lst_how:
       for x2 in df_dataCol:
@@ -89,6 +89,7 @@ def agg_mmQqWw(df_nation,dt_from ,dt_to):
     df_month.columns = lst_cols
     df_quarter = df_daily.resample('Q',how=lst_how)
     df_quarter.columns = lst_cols
+    df_quarter['date'] = df_quarter.index
     df_week = df_daily.resample('W',how=lst_how)
     df_week.columns = lst_cols
     #주단위 경우, 데이터의 시작일과 끝이 주 중간에서 시작하고 끝날 수 있기 때문에 집계가 안될 수 있어 첫주와 마지막주는 fill로 매꾸어줌
@@ -133,6 +134,8 @@ GUI에서 데이터와 일자를 일괄적으로 요첳할때 호출하는 함�
     df_gdp = extract_gdp_excel('../data/Ecos_gdp.xlsx','Sheet1')
     df_gdp = df_gdp.ix[df_quarter.index] #df_quarter가 가지고 있는 범위 만큼만 잘라줌
     df_gdp = df_gdp[lst_nation[0]] #첫번째가 국가, 두번째는 글로벌이기 때문
+    
+    df_quarter['gdp'] = df_gdp
     
     return df_gdp, df_quarter,df_month,df_week,df_daily
 
