@@ -38,7 +38,24 @@ def extract_bloomberg_excel(str_bbDataFile, str_bbIndexFile,is_excel):
     else:
         df_bbData = pd.read_csv('../data/DailyEconomicData.csv',sep='\t',encoding='utf-8')
         df_bbDataCol = pd.read_csv('../data/index.csv',sep='\t',encoding='utf-8')
+
+
+def join_ecos_bloomberg(str_ecosXlsFile, str_bbCsvFile):
+    '''
+    ecos 데이터와  bloomberg 데이터를 합침
+    :param str_ecosXlsFile:
+    :param str_bbCsvFile:
+    '''
     
+    bb = pd.read_csv(str_bbCsvFile,sep='\t', encoding='utf-8')
+    bb.index = pd.to_datetime(bb[bb.columns[0]],format='%Y-%m-%d')
+    
+    ecos = pd.read_excel(str_ecosXlsFile,'data')
+    ecos.index = pd.to_datetime(ecos['date'],format='%Y%m%d')
+    
+    bb=bb['20000102':'20131231'] #Bloomberg의 데이터 양이 더 적기 때문에 bb를 기준으로 자름. 다만 bb에 날짜형식이 아닌 데이터가 포함되어 있기 때문에 제거함
+    
+    return bb.join(ecos)
 
     
 def extract_national_df(lst_nation):
