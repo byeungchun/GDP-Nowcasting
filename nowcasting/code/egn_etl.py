@@ -7,6 +7,7 @@
 # Copyright :
 
 import pandas as pd
+import numpy as np
 
 df_bbData = pd.DataFrame()
 df_bbDataCol = pd.DataFrame()
@@ -47,16 +48,27 @@ def join_ecos_bloomberg(str_ecosXlsFile, str_bbCsvFile):
     :param str_bbCsvFile:
     '''
     
+    global df_bbData
+    
     bb = pd.read_csv(str_bbCsvFile,sep='\t', encoding='utf-8')
+    bb = bb[:5209] #제일 끝 2개의 행에 날짜 형식이 아닌 값이 들어 있어 제거
     bb.index = pd.to_datetime(bb[bb.columns[0]],format='%Y-%m-%d')
+    bb = bb[bb.columns[1:]]
     
     ecos = pd.read_excel(str_ecosXlsFile,'data')
-    ecos.index = pd.to_datetime(ecos['date'],format='%Y%m%d')
-    
+    ecos.index = pd.to_datetime(ecos['date'].astype(str),format='%Y%m%d')
+    ecos = ecos[ecos.columns[1:]]
+    ecos.columns=map(lambda x: x[-3:], ecos.columns)
     bb=bb['20000102':'20131231'] #Bloomberg의 데이터 양이 더 적기 때문에 bb를 기준으로 자름. 다만 bb에 날짜형식이 아닌 데이터가 포함되어 있기 때문에 제거함
     
-    return bb.join(ecos)
+    df_bbData = bb.join(ecos)
+    
+    #셀의 값이 0인 것 중에 컬럼평균이 10보다 크면 그 값을 null로 변환
+    for i in df_bbData.columns:
+      if df_bbData[i].mean > 10:
+        df_bbData[i][df_bbData[i] == 0] = np.nan
 
+    
     
 def extract_national_df(lst_nation):
     '''
@@ -67,7 +79,7 @@ def extract_national_df(lst_nation):
     global df_bbDataCol
     
     df_bbData1 = df_bbData.ffill() #첫행부터 데이터가 없는 개수를 파악하기 위해 중간에 빈 값을 채워줌
-    df_bbData1 = df_bbData1.ix[:-2,:] #데이터가 2013년 4월 7일 이휴는 정확하지 않아 잘라줌
+    #df_bbData1 = df_bbData1.ix[:-2,:] #데이터가 2013년 4월 7일 이휴는 정확하지 않아 잘라줌
     df_bbDataZero = pd.DataFrame([df_bbData1.columns,map(lambda x: df_bbData1[x].dropna().count(), df_bbData1.columns)]).T
     df_bbDataZero.columns = ['no','nozero_cnt']
     #데이터 인덱스의 이름을 가지고와서 'no','idx','nozero_cnt' 로 구성
@@ -144,6 +156,9 @@ GUI에서 데이터와 일자를 일괄적으로 요첳할때 호출하는 함�
         df_bbData.index.name = 'date'
         #df_bbDataCol.index = df_bbDataCol[df_bbDataCol.columns[0]]
         df_bbDataCol = df_bbDataCol[df_bbDataCol.columns[1:]]
+
+    #bloomberg와 ecos를 합쳐서 보여줌
+    join_ecos_bloomberg('../data/ecos_daily.xls','../data/DailyEconomicData.csv')
 
     df_nation = extract_national_df(lst_nation)
     df_quarter,df_month,df_week,df_daily = agg_mmQqWw(df_nation,dt_from,dt_to)
