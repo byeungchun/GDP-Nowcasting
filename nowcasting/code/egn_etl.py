@@ -8,6 +8,8 @@
 
 import pandas as pd
 import numpy as np
+import sqlite3 as lite
+from pandas.io import sql
 
 df_bbData = pd.DataFrame()
 df_bbDataCol = pd.DataFrame()
@@ -126,6 +128,38 @@ def agg_mmQqWw(df_nation,dt_from ,dt_to):
     df_week=df_week.bfill()
     
     return df_quarter, df_month, df_week, df_daily
+  
+  
+def agg_mmQqWw2(dt_from ,dt_to):
+    '''
+일별 데이터를 분기, 월, 주 단위로 집계
+    :param dt_from: 시작일자 ex) pd.datetime(2002,3,1)
+    :param dt_to: 끝 일자 ex) pd.datetime(2014,3,31)
+    '''
+    df_daily = df_bbData
+    df_daily = df_daily.dropna()
+    df_daily = df_daily.ix[dt_from:dt_to]
+    df_daily = df_daily.ffill() #중간에 비어있는 셀은 직전 값을 채워 넣음
+    df_dataCol = df_daily.columns
+    #df_daily.columns = df_dataCol
+    lst_how = ['mean','var','first','last','min','median','max']
+    lst_cols = []
+    for x1 in lst_how:
+      for x2 in df_dataCol:
+        lst_cols.append(x2+'_'+x1)        
+    df_month = df_daily.resample('M',how=lst_how)
+    df_month.columns = lst_cols
+    df_quarter = df_daily.resample('Q',how=lst_how)
+    df_quarter.columns = lst_cols
+    df_quarter['date'] = df_quarter.index
+    df_week = df_daily.resample('W',how=lst_how)
+    df_week.columns = lst_cols
+    #주단위 경우, 데이터의 시작일과 끝이 주 중간에서 시작하고 끝날 수 있기 때문에 집계가 안될 수 있어 첫주와 마지막주는 fill로 매꾸어줌
+    df_week=df_week.ffill()
+    df_week=df_week.bfill()
+    
+    return df_quarter, df_month, df_week, df_daily
+
 
 
 def extract_gdp_excel(xlsx_file, sheet_name):
@@ -172,8 +206,43 @@ GUI에서 데이터와 일자를 일괄적으로 요첳할때 호출하는 함�
     return df_gdp, df_quarter,df_month,df_week,df_daily
 
 
+
+def request_data_from_db(nations,dt_from,dt_to):
+  
+    global df_bbData
+    #bloomberg와 ecos를 합쳐서 보여줌
+    con = lite.connect('../data/nowcasting.db')
+    df_idxData = sql.read_frame('select * from idx_data',con=con)
+    df_idxIndex = sql.read_frame('select * from idx_desc',con=con)
+    df_gdp = sql.read_frame('select * from idx_gdp',con=con)
+    
+    df_idxData.index = pd.to_datetime(df_idxData[df_idxData.columns[0]])
+    df_idxData = df_idxData[df_idxData.columns[1:]]
+    
+    df_gdp.index = pd.to_datetime(df_gdp['date'])
+    df_gdp = df_gdp[df_gdp.columns[:-1]]
+    
+    lst_degIdx = df_idxIndex[df_idxIndex['rgn2'].isin(nations)]['num']
+    df_idxData = df_idxData[df_idxData.columns[df_idxData.columns.isin(lst_degIdx)]]
+    
+    df_bbData = df_idxData
+
+    #df_nation = extract_national_df(lst_nation)
+    df_quarter,df_month,df_week,df_daily = agg_mmQqWw2(dt_from,dt_to)
+    
+    #df_gdp = extract_gdp_excel('../data/Ecos_gdp.xlsx','Sheet1')
+    df_gdp = df_gdp.ix[df_quarter.index] #df_quarter가 가지고 있는 범위 만큼만 잘라줌
+    df_gdp = df_gdp[nations[0].encode('utf-8')] #첫번째가 국가, 두번째는 글로벌이기 때문
+    
+    df_quarter['gdp'] = df_gdp
+    
+    return df_quarter,df_month,df_week
+
+
 if __name__ == '__main__':
-    df_gdp, df_quarter,df_month,df_week,df_daily = request_data_from_processing(False,[u'한국',u'글로벌'],pd.datetime(2002,3,1),pd.datetime(2013,12,31))
+    #df_gdp, df_quarter,df_month,df_week,df_daily = request_data_from_processing(False,[u'한국',u'글로벌'],pd.datetime(2002,3,1),pd.datetime(2013,12,31))
+    #df_gdp, df_quarter,df_month,df_week,df_daily = request_data_from_join([u'한국',u'글로벌'],pd.datetime(2002,3,1),pd.datetime(2013,12,31))
+    df_quarter,df_month,df_week = request_data_from_db([u'한국',u'글로벌'],pd.datetime(2002,3,1),pd.datetime(2013,12,31))
 
 
 

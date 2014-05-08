@@ -44,7 +44,8 @@ def init_egn(is_gui):
     global arr_pool, df_quarter, lst_quarterlyXs, lst_quarterlyYs, df_month, df_week
     
     if(is_gui): # gui에서는 bloomberg 데이터를 eng_etl.py에서 가져와서 사용
-        df_gdp, df_quarter, df_month, df_week, df_daily = eetl.request_data_from_processing(False,[u'한국',u'글로벌'], pd.datetime(2002,3,1),pd.datetime(2014,3,31))
+        #df_gdp, df_quarter, df_month, df_week, df_daily = eetl.request_data_from_processing(False,[u'한국',u'글로벌'], pd.datetime(2002,3,1),pd.datetime(2014,3,31))
+        df_quarter,df_month,df_week = eetl.request_data_from_db([u'한국',u'글로벌'],pd.datetime(2002,3,1),pd.datetime(2013,12,31))
         lst_quarterlyXs = df_quarter.columns[:-2]
         lst_quarterlyYs = df_quarter.columns[-1]
 
@@ -237,7 +238,8 @@ def execute_egn():
                               'T시점 GDP', 'T시점예측GDP','테스트기간 실측GDP', '테스트기간 예측GDP', '테스트기간 예측GDP(월)', '테스트기간 예측GDP(주)']
     df_finalResult.to_csv('../output/egn_v1_' + time.strftime("%m%d%H%M") + '.csv', sep='\t', index=False)
 
-
+    
+    
 if __name__ == '__main__':
     os.chdir(os.getcwd())
     execute_egn()
