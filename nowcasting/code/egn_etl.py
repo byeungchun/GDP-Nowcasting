@@ -137,9 +137,10 @@ def agg_mmQqWw2(dt_from ,dt_to):
     :param dt_to: 끝 일자 ex) pd.datetime(2014,3,31)
     '''
     df_daily = df_bbData
-    df_daily = df_daily.dropna()
+    #df_daily = df_daily.dropna()
     df_daily = df_daily.ix[dt_from:dt_to]
     df_daily = df_daily.ffill() #중간에 비어있는 셀은 직전 값을 채워 넣음
+    df_daily = df_daily.bfill() #데이터가 처음부터 없는 경우는 뒤어 값을 채워 넣음 (추후에는 없으면 빼는 것으로 2014.5.8)
     df_dataCol = df_daily.columns
     #df_daily.columns = df_dataCol
     lst_how = ['mean','var','first','last','min','median','max']
