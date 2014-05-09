@@ -83,12 +83,12 @@ def evaluate_chrome(df_quarterlyResize, str_exprPeriod, int_populationNo):
     for arr_genes in arr_pop:
         lst_genes = arr_genes[:]
         logging.debug(str(int_startingExpNum) + '번호 염색체:' + str(lst_genes))
-        arr_xValues= sm.add_constant(np.array(df_quarterlyResize[lst_genes]), prepend=True) #X변수에 상수 1을 포함
+        arr_xValues = np.array(df_quarterlyResize[lst_genes])
         arr_xTesting1Values = arr_xValues[-2:-1]    #t-1 시점
         arr_xTesting2Values = arr_xValues[-4:]      #t-4 ~ t 시점
         arr_xTrainingValues = arr_xValues[:-1]      #1 ~ t-1 시점
-        arr_xMonthly = sm.add_constant(np.array(df_month[lst_genes]), prepend=True)  #월별 GDP 예측용 값
-        arr_xWeekly = sm.add_constant(np.array(df_week[lst_genes]), prepend=True)  #주별 GDP 예측용 값
+        arr_xMonthly=np.array(df_month[lst_genes])
+        arr_xWeekly=np.array(df_week[lst_genes])
         
         clf.fit(arr_xTrainingValues, arr_yTrainingValues)
         
