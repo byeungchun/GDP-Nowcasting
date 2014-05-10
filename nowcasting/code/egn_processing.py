@@ -36,7 +36,7 @@ logging.basicConfig(level=logging.INFO, format='[%(asctime)s][%(levelname)s][%(f
 np.random.seed(5252)
 
 
-def init_egn(is_gui):
+def init_egn(is_gui,lst_nations):
     """
     (1)집계된 데이터 입력, (2)GDP, 지표 구분, (3)지표 Pool 생성
 
@@ -45,7 +45,7 @@ def init_egn(is_gui):
     
     if(is_gui): # gui에서는 bloomberg 데이터를 eng_etl.py에서 가져와서 사용
         #df_gdp, df_quarter, df_month, df_week, df_daily = eetl.request_data_from_processing(False,[u'한국',u'글로벌'], pd.datetime(2002,3,1),pd.datetime(2014,3,31))
-        df_quarter,df_month,df_week = eetl.request_data_from_db([u'한국',u'글로벌'],pd.datetime(2002,3,1),pd.datetime(2013,12,31))
+        df_quarter,df_month,df_week = eetl.request_data_from_db(lst_nations,pd.datetime(2003,1,1),pd.datetime(2013,12,31))
         lst_quarterlyXs = df_quarter.columns[:-2]
         lst_quarterlyYs = df_quarter.columns[-1]
 
@@ -78,7 +78,7 @@ def evaluate_chrome(df_quarterlyResize, str_exprPeriod, int_populationNo):
     arr_yTrainingValues = np.array(df_quarterlyResize[lst_quarterlyYs])[:-1]
     arr_yTesting1Values = np.array(df_quarterlyResize[lst_quarterlyYs])[-2:-1]
     arr_yTesting2Values = np.array(df_quarterlyResize[lst_quarterlyYs])[-4:]
-
+    lst_popResult = []
     #세대에서 염색체를 뽑아 SVM fitting을 하고 평가하여 결과를 저장
     for arr_genes in arr_pop:
         lst_genes = arr_genes[:]
@@ -102,32 +102,37 @@ def evaluate_chrome(df_quarterlyResize, str_exprPeriod, int_populationNo):
         dbl_testingPeriodCoef = np.corrcoef(arr_yTesting2Values, arr_predictValuesTesting2Quarterly)[0, 1]
 
         if np.isnan(dbl_testingPeriodCoef): dbl_testingPeriodCoef = 0.0 #상관계수가 계산이 안되면 0으로 표시
-        dbl_predictionErrorCdf = float(ss.norm(0, 1).cdf(abs(arr_yTesting1Values - arr_predictValuesTesting1Quarterly)))
+        #실측 값으로 구하기 때문에 확률분포를 이용한 것임. GDP의 실측 값이 컷을때와 작을때에도 동일한 확률값을 보여줄 수 있게
+        dbl_error = arr_yTesting1Values - arr_predictValuesTesting1Quarterly
+        dbl_predictionErrorCdf = float(ss.norm(0, 1).cdf(abs(dbl_error)))
 
         if np.isnan(dbl_trainingPeriodCoef): #상관계수가 계산이 안되면 -9999.0으로 표시
             dbl_trainingPeriodCoef = -9999.0
         dbl_evaluationValue = calc_evaluation(dbl_trainingPeriodCoef, dbl_predictionErrorCdf, dbl_evaluationWeight)
         lst_chromeEvaluationResult.append(dbl_evaluationValue)  #평가점수
 
-        lst_chromeResult.append(str_exprPeriod)     #기간
-        lst_chromeResult.append(int_startingExpNum) #일련번호
-        lst_chromeResult.append(int_populationNo)   #세대번호
-        lst_chromeResult.append(arr_genes)          #지표
-        lst_chromeResult.append(dbl_trainingPeriodCoef) #상관계수
-        lst_chromeResult.append(dbl_predictionErrorCdf) #t-1 예측오차
-        lst_chromeResult.append(dbl_evaluationWeight)   #가중치
-        lst_chromeResult.append(dbl_evaluationValue)    #평가점수
-        lst_chromeResult.append(arr_yTesting2Values[-1])    #T시점 GDP
-        lst_chromeResult.append(arr_predictValuesTesting2Quarterly[-1]) #T시점예측GDP
-        lst_chromeResult.append(arr_yTesting2Values)    #테스트기간 실측GDP
-        lst_chromeResult.append(arr_predictValuesTesting2Quarterly) #테스트기간 예측GDP
-        lst_chromeResult.append(str(arr_predictValuesMonthly.tolist())[1:-1])   #테스트기간 예측GDP(월단위)
-        lst_chromeResult.append(str(arr_predictValuesWeekly.tolist())[1:-1])    #테스트기간 예측GDP(주단위)
+        lst_chromeResult.append(str_exprPeriod)     #기간, 0
+        lst_chromeResult.append(int_startingExpNum) #일련번호, 1
+        lst_chromeResult.append(int_populationNo)   #세대번호, 2
+        lst_chromeResult.append(arr_genes)          #지표, 3
+        lst_chromeResult.append(dbl_trainingPeriodCoef) #상관계수, 4
+        lst_chromeResult.append(dbl_predictionErrorCdf) #t-1 예측오차 분포, 5
+        lst_chromeResult.append(dbl_error[0])   #t-1오차, 6
+        lst_chromeResult.append(dbl_evaluationValue)    #평가점수, 7
+        lst_chromeResult.append(arr_yTesting2Values[-1])    #T시점 GDP, 8
+        lst_chromeResult.append(arr_predictValuesTesting2Quarterly[-1]) #T시점예측GDP, 9
+        lst_chromeResult.append(arr_yTesting2Values)    #테스트기간 실측GDP, 10
+        lst_chromeResult.append(arr_predictValuesTesting2Quarterly) #테스트기간 예측GDP, 11
+        lst_chromeResult.append(str(arr_predictValuesMonthly.tolist())[1:-1])   #테스트기간 예측GDP(월단위), 12
+        lst_chromeResult.append(str(arr_predictValuesWeekly.tolist())[1:-1])    #테스트기간 예측GDP(주단위), 13
 
         lst_nowcastingResult.append(lst_chromeResult)
+        lst_popResult.append(lst_chromeResult)
 
         int_startingExpNum += 1
-
+    df_popResult=pd.DataFrame(lst_popResult)
+    df_popResult= df_popResult[df_popResult.columns[4:8]]
+    logging.info(str_exprPeriod + '번째 세대:'+str(np.round(list(df_popResult.mean()),2)))
     return lst_chromeEvaluationResult
 
 
@@ -208,11 +213,11 @@ def evolve_population(df_populationTable, int_populationIndex):
     logging.debug(str(int_populationIndex) + '세대 염색체 수(교배후): ' + str(len(arr_pop)))
 
 
-def execute_egn():
+def execute_egn(lst_nations):
     global lst_nowcastingResult, date_forecastingPeriod, df_month, df_week
 
     int_gap = 21 #훈련기간(20) + 예측기간(1)
-    init_egn(True)
+    init_egn(True,lst_nations)
     arr_testingPoints = np.arange(0, len(df_quarter), 1)
     for int_testingPoint in arr_testingPoints:  #기간에 따른 조건 변경
         if int_testingPoint == 1: break  #마지막 값에는 GDP가 없기 때문에 계산 안함
@@ -221,25 +226,26 @@ def execute_egn():
         date_forecastingPeriod = pd.to_datetime(df_quarterlyResize['date'][-2:])
         df_month = df_month.ix[date_forecastingPeriod.values[1]:][1:]
         df_week = df_week.ix[date_forecastingPeriod.values[1]:][1:]
-        logging.info(str(int_testingPoint) + '번째 윈도우')
+        #logging.info(str(int_testingPoint) + '번째 윈도우')
 
         for int_populationIndex in range(100):  # 세대수
             if int_populationIndex == 0:
                 generate_population(0) #첫번째 세대
                 continue
             arr_populationEvaluation = evaluate_chrome(df_quarterlyResize, str(int_testingPoint) + '_' + str(int_gap), int_populationIndex) #세대 결과값
+           
             df_populationTable = pd.DataFrame(arr_pop, columns=['chrome']); #세대 현황
             df_populationTable['evaluation'] = pd.DataFrame(arr_populationEvaluation)
             evolve_population(df_populationTable, int_populationIndex)    #다음세대로의 진화
             generate_population(int_populationIndex)  #새로운 세대에서 부족한 염색체 생성
 
     df_finalResult = pd.DataFrame(lst_nowcastingResult)
-    df_finalResult.columns = ['기간', '일련번호', '세대번호', '지표', '상관계수', 't-1 예측오차', '가중치', '평가점수',
+    df_finalResult.columns = ['기간', '일련번호', '세대번호', '지표', '상관계수', 't-1예측오차율', 't-1예측오차', '평가점수',
                               'T시점 GDP', 'T시점예측GDP','테스트기간 실측GDP', '테스트기간 예측GDP', '테스트기간 예측GDP(월)', '테스트기간 예측GDP(주)']
-    df_finalResult.to_csv('../output/egn_v1_' + time.strftime("%m%d%H%M") + '.csv', sep='\t', index=False)
+    #df_finalResult.to_csv('../output/egn_v1_' + time.strftime("%m%d%H%M") + '.csv', sep='\t', index=False)
 
     
     
 if __name__ == '__main__':
     os.chdir(os.getcwd())
-    execute_egn()
+    execute_egn([u'한국',u'글로벌'])

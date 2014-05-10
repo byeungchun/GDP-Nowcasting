@@ -217,6 +217,8 @@ def request_data_from_db(nations,dt_from,dt_to):
     df_idxIndex = sql.read_frame('select * from idx_desc',con=con)
     df_gdp = sql.read_frame('select * from idx_gdp',con=con)
     
+    con.close()
+    
     df_idxData.index = pd.to_datetime(df_idxData[df_idxData.columns[0]])
     df_idxData = df_idxData[df_idxData.columns[1:]]
     
@@ -225,6 +227,9 @@ def request_data_from_db(nations,dt_from,dt_to):
     
     lst_degIdx = df_idxIndex[df_idxIndex['rgn2'].isin(nations)]['num']
     df_idxData = df_idxData[df_idxData.columns[df_idxData.columns.isin(lst_degIdx)]]
+    
+    #I529, I530은 데이터가 워낙 적어 빼줌
+    df_idxData = df_idxData.drop(['I529','I530'],1)
     
     df_bbData = df_idxData
 
@@ -243,7 +248,7 @@ def request_data_from_db(nations,dt_from,dt_to):
 if __name__ == '__main__':
     #df_gdp, df_quarter,df_month,df_week,df_daily = request_data_from_processing(False,[u'한국',u'글로벌'],pd.datetime(2002,3,1),pd.datetime(2013,12,31))
     #df_gdp, df_quarter,df_month,df_week,df_daily = request_data_from_join([u'한국',u'글로벌'],pd.datetime(2002,3,1),pd.datetime(2013,12,31))
-    df_quarter,df_month,df_week = request_data_from_db([u'한국',u'글로벌'],pd.datetime(2002,3,1),pd.datetime(2013,12,31))
+    df_quarter,df_month,df_week = request_data_from_db([u'한국',u'글로벌'],pd.datetime(2003,1,1),pd.datetime(2013,12,31))
 
 
 
