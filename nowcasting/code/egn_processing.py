@@ -29,8 +29,8 @@ int_startingExpNum = 10000000  #실험 일련번호
 lst_nowcastingResult = []  #결과저장
 
 #사용자 파라미터
-int_numChromesInPop = 100  #세대당 염색체 개수
-int_probGeneLive = 100  #유전자를 고를때 살아남을 확률. 예를들어 10이면 10%, 100이면 1%, 2이면 50%
+int_numChromesInPop = 200  #세대당 염색체 개수
+int_probGeneLive = 50  #유전자를 고를때 살아남을 확률. 예를들어 10이면 10%, 100이면 1%, 2이면 50%
 
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s][%(levelname)s][%(funcName)s][%(lineno)d] %(message)s')
 np.random.seed(5252)
@@ -74,7 +74,7 @@ def evaluate_chrome(df_quarterlyResize, str_exprPeriod, int_populationNo):
 
     clf = svm.SVR()
     lst_chromeEvaluationResult = []
-    dbl_evaluationWeight = 1  # 평가함수 가중치
+    dbl_evaluationWeight = 0.05  # 평가함수 가중치
     arr_yTrainingValues = np.array(df_quarterlyResize[lst_quarterlyYs])[:-1]
     arr_yTesting1Values = np.array(df_quarterlyResize[lst_quarterlyYs])[-2:-1]
     arr_yTesting2Values = np.array(df_quarterlyResize[lst_quarterlyYs])[-4:]
@@ -131,8 +131,8 @@ def evaluate_chrome(df_quarterlyResize, str_exprPeriod, int_populationNo):
 
         int_startingExpNum += 1
     df_popResult=pd.DataFrame(lst_popResult)
-    df_popResult= df_popResult[df_popResult.columns[4:8]]
-    logging.info(str_exprPeriod + '번째 세대:'+str(np.round(list(df_popResult.mean()),2)))
+    df_popResult= df_popResult[df_popResult.columns[4:8]].sort(columns=[6]).head(4)
+    logging.info(str(int_populationNo) + '세대  평균('+str(df_popResult.shape[0])+'개 염색체):'+str(np.round(list(df_popResult.mean()),4)))
     return lst_chromeEvaluationResult
 
 
@@ -226,9 +226,9 @@ def execute_egn(lst_nations):
         date_forecastingPeriod = pd.to_datetime(df_quarterlyResize['date'][-2:])
         df_month = df_month.ix[date_forecastingPeriod.values[1]:][1:]
         df_week = df_week.ix[date_forecastingPeriod.values[1]:][1:]
-        #logging.info(str(int_testingPoint) + '번째 윈도우')
+        logging.info('예측시점:'+str(df_quarterlyResize.index[-1]))
 
-        for int_populationIndex in range(100):  # 세대수
+        for int_populationIndex in range(500):  # 세대수
             if int_populationIndex == 0:
                 generate_population(0) #첫번째 세대
                 continue
